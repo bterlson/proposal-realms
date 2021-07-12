@@ -147,16 +147,11 @@ location: https://tc39.es/proposal-realms/
 					1. If _body_ Contains |SuperCall| is *true*, throw a *SyntaxError* exception.
 				1. Let _strictEval_ be IsStrict of _script_.
 				1. Let _runningContext_ be the running execution context.
-				1. Let _lexEnv_ be NewDeclarativeEnvironment(_evalRealm_.[[GlobalEnv]]).
-				1. Let _varEnv_ be _evalRealm_.[[GlobalEnv]].
 				1. If _strictEval_ is *true*, set _varEnv_ to _lexEnv_.
 				1. If _runningContext_ is not already suspended, suspend _runningContext_.
-				1. Let _evalContext_ be a new ECMAScript code execution context.
-				1. Set _evalContext_'s Function to *null*.
-				1. Set _evalContext_'s Realm to _evalRealm_.
-				1. Set _evalContext_'s ScriptOrModule to *null*.
-				1. Set _evalContext_'s VariableEnvironment to _varEnv_.
-				1. Set _evalContext_'s LexicalEnvironment to _lexEnv_.
+				1. Let _evalContext_ be ! GetNewRealmContext(_evalRealm_).
+				1. Let _lexEnv_ be the _evalContext_'s LexicalEnvironment.
+				1. Let _varEnv_ be the _evalContext_'s VariableEnvironment.
 				1. Push _evalContext_ onto the execution context stack; _evalContext_ is now the running execution context.
 				1. Let _result_ be EvalDeclarationInstantiation(_body_, _varEnv_, _lexEnv_, *null*, _strictEval_).
 				1. If _result_.[[Type]] is ~normal~, then
@@ -180,13 +175,13 @@ location: https://tc39.es/proposal-realms/
 		</emu-clause>
 
 		<emu-clause id="sec-realmimportvalue" aoid="RealmImportValue">
-			<h1>RealmImportValue ( _specifierString_, _exportNameString_, _callerRealm_, _evalRealm_, _evalContext_ )</h1>
+			<h1>RealmImportValue ( _specifierString_, _exportNameString_, _callerRealm_, _evalRealm_ )</h1>
 			<emu-alg>
 				1. Assert: Type(_specifierString_) is String.
 				1. Assert: Type(_exportNameString_) is String.
 				1. Assert: _callerRealm_ is a Realm Record.
 				1. Assert: _evalRealm_ is a Realm Record.
-				1. Assert: _evalContext_ is an execution context associated to a Realm instance's [[ExecutionContext]].
+				1. Let _evalContext_ be ! GetNewRealmContext( _evalRealm_ ).
 				1. Let _innerCapability_ be ! NewPromiseCapability(%Promise%).
 				1. Let _runningContext_ be the running execution context.
 				1. If _runningContext_ is not already suspended, suspend _runningContext_.
@@ -225,6 +220,23 @@ location: https://tc39.es/proposal-realms/
 				1. Return _value_.
 			</emu-alg>
 		</emu-clause>
+
+		<emu-clause id="sec-getnewrealmcontext" aoid="GetNewRealmContext">
+			<h1>GetNewRealmContext ( _realmRecord_ )</h1>
+			<emu-alg>
+				1. Assert: _realmRecord_ is a Realm Record.
+				1. If _strictEval_ is *true*, set _varEnv_ to _lexEnv_.
+				1. If _runningContext_ is not already suspended, suspend _runningContext_.
+				1. Let _context_ be a new ECMAScript code execution context.
+				1. Set _context_'s Function to *null*.
+				1. Set _context_'s Realm to _realmRecord_.
+				1. Set _context_'s ScriptOrModule to *null*.
+				1. Set _context_'s VariableEnvironment to NewDeclarativeEnvironment(_realmRecord_.[[GlobalEnv]]).
+				1. Set _context_'s LexicalEnvironment to _realmRecord_.[[GlobalEnv]].
+				1. Set _context_'s PrivateEnvironment to *null*.
+				1. Return _context_.
+			</emu-alg>
+		</emu-clause>
 	</emu-clause>
 
 	<emu-clause id="sec-realm-constructor">
@@ -243,14 +255,9 @@ location: https://tc39.es/proposal-realms/
 			<p>When the `Realm` function is called, the following steps are taken:</p>
 			<emu-alg>
 				1. If NewTarget is *undefined*, throw a *TypeError* exception.
-				1. Let _O_ be ? OrdinaryCreateFromConstructor(NewTarget, *"%Realm.prototype%"*, « [[Realm]], [[ExecutionContext]] »).
+				1. Let _O_ be ? OrdinaryCreateFromConstructor(NewTarget, *"%Realm.prototype%"*, « [[Realm]] »).
 				1. Let _realmRec_ be CreateRealm().
 				1. Set _O_.[[Realm]] to _realmRec_.
-				1. Let _context_ be a new execution context.
-				1. Set the Function of _context_ to *null*.
-				1. Set the Realm of _context_ to _realmRec_.
-				1. Set the ScriptOrModule of _context_ to *null*.
-				1. Set _O_.[[ExecutionContext]] to _context_.
 				1. Perform ? SetRealmGlobalObject(_realmRec_, *undefined*, *undefined*).
 				1. Perform ? SetDefaultGlobalBindings(_O_.[[Realm]]).
 				1. Perform ? HostInitializeSyntheticRealm(_O_.[[Realm]]).
@@ -313,8 +320,7 @@ location: https://tc39.es/proposal-realms/
 				1. Let _exportNameString_ be ? ToString(_exportName_).
 				1. Let _callerRealm_ be the current Realm Record.
 				1. Let _evalRealm_ be _O_.[[Realm]].
-				1. Let _evalContext_ be _O_.[[ExecutionContext]].
-				1. Return ? RealmImportValue(_specifierString_, _exportNameString_, _callerRealm_, _evalRealm_, _evalContext_).
+				1. Return ? RealmImportValue(_specifierString_, _exportNameString_, _callerRealm_, _evalRealm_).
 			</emu-alg>
 
 			<emu-note type=editor>
@@ -328,7 +334,6 @@ location: https://tc39.es/proposal-realms/
 
 			<emu-alg>
 				1. Perform ? RequireInternalSlot(_O_, [[Realm]]).
-				1. Perform ? RequireInternalSlot(_O_, [[ExecutionContext]]).
 			</emu-alg>
 		</emu-clause>
 
@@ -355,11 +360,6 @@ location: https://tc39.es/proposal-realms/
 						<td>[[Realm]]</td>
 						<td>Realm Record</td>
 						<td>The Realm Record for the initial execution context.</td>
-					</tr>
-					<tr>
-						<td>[[ExecutionContext]]</td>
-						<td>Execution context</td>
-						<td>An execution context wherein the current Realm is this [[Realm]].</td>
 					</tr>
 				</tbody>
 			</table>
